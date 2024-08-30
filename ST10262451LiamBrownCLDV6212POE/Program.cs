@@ -1,33 +1,52 @@
-using Microsoft.Extensions.Azure;
-var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-builder.Services.AddControllersWithViews();
-builder.Services.AddAzureClients(clientBuilder =>
+public class Program
 {
-    clientBuilder.AddBlobServiceClient(builder.Configuration["ST10262451LiamBrownCLDV6212POE:blob"]!, preferMsi: true);
-    clientBuilder.AddQueueServiceClient(builder.Configuration["ST10262451LiamBrownCLDV6212POE:queue"]!, preferMsi: true);
-});
+    public static void Main(string[] args)
+    {
+        CreateHostBuilder(args).Build().Run();
+    }
 
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
+    public static IHostBuilder CreateHostBuilder(string[] args) =>
+        Host.CreateDefaultBuilder(args)
+            .ConfigureWebHostDefaults(webBuilder =>
+            {
+                webBuilder.UseStartup<Startup>();
+            });
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+public class Startup
+{
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddControllersWithViews();
 
-app.UseRouting();
+        var storageConnectionString = Configuration["AzureStorage:ConnectionString"];
+        services.AddSingleton(new AzureTableService(storageConnectionString));
+        services.AddSingleton(new AzureBlobService(storageConnectionString, "images"));
+    }
 
-app.UseAuthorization();
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+        else
+        {
+            app.UseExceptionHandler("/Home/Error");
+            app.UseHsts();
+        }
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+        app.UseRouting();
 
-app.Run();
+        app.UseAuthorization();
+
+        app.UseEndpoints(endpoints =>
+        {
+            endpoints.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
+        });
+    }
+}
